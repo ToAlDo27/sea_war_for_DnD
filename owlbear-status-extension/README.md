@@ -12,7 +12,7 @@
 https://raw.githack.com/ToAlDo27/sea_war_for_DnD/main/owlbear-status-extension/manifest.json
 ```
 
-Этот адрес берёт файлы прямо из ветки `main` на GitHub и отдаёт их по HTTPS с корректным типом `text/html` для панели расширения.
+Этот адрес берёт файлы прямо из ветки `main` на GitHub и отдаёт их по HTTPS с корректным типом `text/html` для панели расширения. Внутри manifest используются абсолютные HTTPS-ссылки на панель и иконку, чтобы Owlbear не ошибался при открытии вложенной папки.
 
 ## Запуск
 
