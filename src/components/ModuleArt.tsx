@@ -121,8 +121,53 @@ function signature(def: ModuleDef): string {
   return text || def.category.slice(0, 2).toUpperCase()
 }
 
+function isMagicWeapon(def: ModuleDef): boolean {
+  if (def.category !== 'weapon') return false
+
+  const hay = [
+    def.id,
+    def.name,
+    def.subtype ?? '',
+    def.description ?? '',
+    def.effect ?? '',
+    ...(def.requirements ?? []),
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    (def.energyCost ?? 0) > 0 ||
+    hay.includes('генератор') ||
+    hay.includes('маг') ||
+    hay.includes('magic') ||
+    hay.includes('rune') ||
+    hay.includes('dragon') ||
+    hay.includes('thunder') ||
+    hay.includes('ice') ||
+    hay.includes('acid') ||
+    hay.includes('siren') ||
+    hay.includes('mist') ||
+    hay.includes('wave') ||
+    hay.includes('shadow') ||
+    hay.includes('deep') ||
+    hay.includes('light') ||
+    hay.includes('sleep') ||
+    hay.includes('sun') ||
+    hay.includes('magnetic') ||
+    hay.includes('abyss') ||
+    hay.includes('star') ||
+    hay.includes('leviathan')
+  )
+}
+
+function artColors(def: ModuleDef) {
+  if (def.category !== 'weapon') return CATEGORY_COLORS[def.category]
+  return isMagicWeapon(def) ? { base: '#075f78', border: '#67e8f9' } : { base: '#7f1d1d', border: '#ef4444' }
+}
+
 export default function ModuleArt({ def, compact = false, tiny = false }: { def: ModuleDef; compact?: boolean; tiny?: boolean }) {
-  const colors = CATEGORY_COLORS[def.category]
+  const magicWeapon = isMagicWeapon(def)
+  const colors = artColors(def)
   const sizeClass = tiny ? 'h-10 w-10' : compact ? 'h-14 w-14' : 'h-24 w-24'
   const h = hashId(def.id)
   const markCount = 2 + (h % 4)
@@ -135,12 +180,19 @@ export default function ModuleArt({ def, compact = false, tiny = false }: { def:
           `radial-gradient(circle at ${30 + (h % 40)}% ${24 + (h % 28)}%, rgba(255,244,205,.18), transparent 30%), ` +
           `linear-gradient(${160 + (h % 70)}deg, ${colors.base}e6, rgba(46,22,9,.95))`,
         boxShadow: `inset 0 0 18px rgba(255,226,160,.08), inset 0 -18px 28px rgba(0,0,0,.42), 0 0 10px rgba(0,0,0,.35)`,
-        color: '#fff5d7',
+        color: def.category === 'weapon' ? (magicWeapon ? '#d7fbff' : '#ffe7e0') : '#fff5d7',
       }}
       title={def.name}
       aria-label={def.name}
     >
       <Icon kind={iconKind(def)} />
+      {def.category === 'weapon' && (
+        <span
+          className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-black/45"
+          style={{ backgroundColor: magicWeapon ? '#67e8f9' : '#ef4444', boxShadow: `0 0 8px ${magicWeapon ? '#67e8f9' : '#ef4444'}` }}
+          title={magicWeapon ? 'Магическое орудие' : 'Немагическое орудие'}
+        />
+      )}
       <svg className="absolute inset-0 h-full w-full opacity-35" viewBox="0 0 100 100" aria-hidden="true">
         {Array.from({ length: markCount }).map((_, i) => {
           const x = 14 + ((h >> (i * 3)) % 72)

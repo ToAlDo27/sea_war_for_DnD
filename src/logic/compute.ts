@@ -207,12 +207,23 @@ export function computeDerived(state: GameState): DerivedState {
   }
 
   // ---- Предварительный «working» (без лимита орудий) ----
+  const energyOk: Record<string, boolean> = {}
+  for (const inst of [...gridInstances, ...upgradeInstances]) {
+    const def = defMap.get(inst.defId)!
+    const cost = def.energyCost ?? 0
+    energyOk[inst.instanceId] = true
+    if (cost > 0 && state.currentEnergy < cost) {
+      addErr(inst.instanceId, `Недостаточно МЭ для активации: нужно ${cost}, доступно ${state.currentEnergy}`)
+      energyOk[inst.instanceId] = false
+    }
+  }
+
   const working: Record<string, boolean> = {}
   for (const inst of gridInstances) {
-    working[inst.instanceId] = structuralOk[inst.instanceId] && requirementsOk[inst.instanceId]
+    working[inst.instanceId] = structuralOk[inst.instanceId] && requirementsOk[inst.instanceId] && energyOk[inst.instanceId]
   }
   for (const inst of upgradeInstances) {
-    working[inst.instanceId] = requirementsOk[inst.instanceId]
+    working[inst.instanceId] = requirementsOk[inst.instanceId] && energyOk[inst.instanceId]
   }
 
   // ---- Лимиты орудий ----

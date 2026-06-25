@@ -30,6 +30,7 @@ export type Action =
   | { type: 'ADJUST_RESOURCE'; key: keyof Resources; delta: number }
   | { type: 'SET_PLAYER_COUNT'; value: number }
   | { type: 'END_DAY' }
+  | { type: 'END_ROUND' }
   | { type: 'SET_CURRENT_HP'; value: number }
   | { type: 'SET_CURRENT_ENERGY'; value: number }
   | { type: 'ADJUST_CURRENT_ENERGY'; delta: number }
@@ -124,11 +125,20 @@ function fireWeapon(state: GameState, instanceId: string): GameState {
       log: pushLog(state, `Выстрел заблокирован: ${def.name}. Причина: ${reason}.`, 'warn'),
     }
   }
+  const energyCost = def.energyCost ?? 0
+  if (energyCost > 0 && state.currentEnergy < energyCost) {
+    return {
+      ...state,
+      log: pushLog(state, `Выстрел заблокирован: ${def.name}. Нужно МЭ: ${energyCost}, доступно: ${state.currentEnergy}.`, 'warn'),
+    }
+  }
   const attack = rollDie(20)
   const damage = rollDamage([def.damage, def.description, def.effect].filter(Boolean).join(' '))
+  const nextEnergy = Math.max(0, state.currentEnergy - energyCost)
   const damageText = damage ? ` Урон ${damage.total} (${damage.parts.join('; ')}).` : ' Урон не найден в описании орудия.'
   return {
     ...state,
+    currentEnergy: nextEnergy,
     log: pushLog(state, `Выстрел: ${def.name}. к20 = ${attack}.${damageText}`, 'build'),
   }
 }
@@ -256,6 +266,23 @@ export function reducer(state: GameState, action: Action): GameState {
           state,
           `День ${state.day} завершён. Расход: ${need} продовольствия и ${need} воды.${warn ? ' Запасов не хватило полностью.' : ''}`,
           warn ? 'warn' : 'system',
+        ),
+      }
+    }
+
+    case 'END_ROUND': {
+      const derived = computeDerived(state)
+      const gained = Math.max(0, derived.energyGeneration)
+      const before = Math.max(0, state.currentEnergy)
+      const after = Math.min(derived.energyStorage, before + gained)
+      const wasted = Math.max(0, before + gained - after)
+      return {
+        ...state,
+        currentEnergy: after,
+        log: pushLog(
+          state,
+          `Раунд завершён. Генераторы дали ${gained} МЭ. Запас МЭ: ${before} -> ${after}${wasted > 0 ? `, потеряно из-за лимита: ${wasted}` : ''}.`,
+          'system',
         ),
       }
     }
