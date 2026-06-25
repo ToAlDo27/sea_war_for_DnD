@@ -112,6 +112,8 @@ export interface ModuleInstance {
   rotated?: boolean
 }
 
+export type DamageMap = Record<string, number>
+
 export interface Resources {
   gold: number
   food: number
@@ -184,6 +186,8 @@ export interface GameState {
 
   catalog: ModuleDef[]
   instances: ModuleInstance[]
+  moduleDamage: DamageMap
+  cellDamage: DamageMap
   shipyardOffers: ShipyardOffer[]
 
   selectedInstanceId: string | null
@@ -207,6 +211,7 @@ export interface GridCell {
   x: number
   y: number
   type: CellType
+  damage: number
   /** Экземпляр, занимающий клетку, либо null. */
   occupiedBy: string | null
 }
@@ -223,6 +228,7 @@ export interface ModuleStatus {
   instanceId: string
   /** Работает корректно (даёт бонусы). */
   working: boolean
+  damage: number
   /** Установлен на сетку/как апгрейд. */
   installed: boolean
   errors: string[]

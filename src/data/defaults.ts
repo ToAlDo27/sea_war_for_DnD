@@ -68,6 +68,8 @@ export function createInitialState(): GameState {
 
     catalog: cloneCatalog(),
     instances: [],
+    moduleDamage: {},
+    cellDamage: {},
     shipyardOffers: [],
 
     selectedInstanceId: null,
@@ -98,6 +100,8 @@ export function resetShipOnly(state: GameState): GameState {
     widthLevel: 0,
     heightLevel: 0,
     instances: [],
+    moduleDamage: {},
+    cellDamage: {},
     selectedInstanceId: null,
   }
 }

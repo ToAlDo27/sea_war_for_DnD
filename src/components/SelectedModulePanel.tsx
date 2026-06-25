@@ -24,6 +24,11 @@ export default function SelectedModulePanel() {
   const working = status?.working
   const errors = status?.errors ?? []
   const colors = CATEGORY_COLORS[def.category]
+  const moduleDamage = status?.damage ?? 0
+  const cellKeys = derived.footprints[inst.instanceId]?.cells.map((c) => `${c.x},${c.y}`) ?? []
+  const slotDamage = Math.max(0, ...cellKeys.map((k) => state.cellDamage[k] ?? 0))
+  const repairCost = Math.max(1, Math.ceil(Math.max(1, moduleDamage) / 25) + (def.weaponSize === 'superHeavy' ? 2 : def.weaponSize === 'heavy' ? 1 : 0))
+  const slotRepairCost = Math.max(1, Math.ceil(Math.max(1, slotDamage) / 25))
 
   const statusText = !placed ? 'Не установлен' : working ? 'Установлен корректно' : 'Установлен с ошибками'
   const statusColor = !placed ? '#9aa7b3' : working ? '#7fe8b0' : '#f0908c'
@@ -46,6 +51,9 @@ export default function SelectedModulePanel() {
   if (def.energyCost) rows.push(['Расход МЭ', def.energyCost])
   if (def.damage) rows.push(['Урон', def.damage])
   if (def.range) rows.push(['Дальность', def.range])
+
+  if (moduleDamage > 0) rows.push(['Повреждение', `${moduleDamage}%`])
+  if (slotDamage > 0) rows.push(['Повреждение слота', `${slotDamage}%`])
 
   return (
     <div className="panel flex min-h-0 flex-col">
@@ -108,6 +116,38 @@ export default function SelectedModulePanel() {
             </button>
           ) : (
             <span className="text-[10px] text-slate-500">Перетащите модуль на сетку для установки.</span>
+          )}
+          {placed && (
+            <>
+              <button className="btn btn-danger px-2 py-1 text-[11px]" onClick={() => dispatch({ type: 'DAMAGE_MODULE', instanceId: inst.instanceId })}>
+                Повредить модуль
+              </button>
+              {moduleDamage > 0 && (
+                <button
+                  className="btn btn-rune px-2 py-1 text-[11px]"
+                  onClick={() => dispatch({ type: 'REPAIR_MODULE', instanceId: inst.instanceId })}
+                  disabled={state.resources.repairMaterials < repairCost}
+                  title={`Нужно ремкомплектов: ${repairCost}`}
+                >
+                  Починить модуль ({repairCost})
+                </button>
+              )}
+              {inst.x != null && inst.y != null && (
+                <button className="btn btn-danger px-2 py-1 text-[11px]" onClick={() => dispatch({ type: 'DAMAGE_CELL', x: inst.x!, y: inst.y! })}>
+                  Повредить слот
+                </button>
+              )}
+              {inst.x != null && inst.y != null && slotDamage > 0 && (
+                <button
+                  className="btn btn-rune px-2 py-1 text-[11px]"
+                  onClick={() => dispatch({ type: 'REPAIR_CELL', x: inst.x!, y: inst.y! })}
+                  disabled={state.resources.repairMaterials < slotRepairCost}
+                  title={`Нужно ремкомплектов: ${slotRepairCost}`}
+                >
+                  Починить слот ({slotRepairCost})
+                </button>
+              )}
+            </>
           )}
           {(state.ui.masterMode || state.ui.activeTab === 'editor') && (
             <button className="btn btn-danger px-2 py-1 text-[11px]" onClick={() => dispatch({ type: 'DELETE_INSTANCE', instanceId: inst.instanceId })}>

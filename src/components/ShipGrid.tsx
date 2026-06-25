@@ -136,7 +136,13 @@ export default function ShipGrid() {
               <div
                 key={`${cell.x},${cell.y}`}
                 className={`relative border border-rune/25 ${activePlacementId ? 'cursor-crosshair' : ''}`}
-                style={{ background: CELL_TINT[cell.type] ?? 'transparent' }}
+                style={{
+                  background:
+                    cell.damage > 0
+                      ? `linear-gradient(135deg, rgba(224,82,77,.42), rgba(224,82,77,.12)), ${CELL_TINT[cell.type] ?? 'transparent'}`
+                      : CELL_TINT[cell.type] ?? 'transparent',
+                }}
+                title={cell.damage > 0 ? `Повреждение слота: ${cell.damage}%` : undefined}
                 onClick={() => {
                   if (!activePlacementId || !activePlacementDef || activePlacementDef.category !== 'weapon') return
                   placeInstanceAt(activePlacementId, cell.x, cell.y, true)
@@ -153,6 +159,11 @@ export default function ShipGrid() {
                 {state.ui.showGridLabels && (
                   <span className="pointer-events-none absolute left-1 top-1 text-[10px] font-bold uppercase tracking-tight text-slate-300/75">
                     {CELL_SHORT[cell.type]}
+                  </span>
+                )}
+                {cell.damage > 0 && (
+                  <span className="pointer-events-none absolute bottom-1 right-1 rounded-sm bg-danger/80 px-1 text-[10px] font-bold text-white">
+                    {cell.damage}%
                   </span>
                 )}
               </div>
@@ -210,15 +221,19 @@ function PlacedBlock({ inst, def }: { inst: ModuleInstance; def: ModuleDef }) {
   const { w, h } = effectiveSize(def, inst.rotated)
   const status = derived.moduleStatus[inst.instanceId]
   const hasError = status && status.errors.length > 0
+  const damage = status?.damage ?? 0
+  const damaged = damage > 0
   const selected = state.selectedInstanceId === inst.instanceId
   const weaponFocus = state.ui.weaponRelocationMode && def.category === 'weapon'
   const dimNonWeapon = state.ui.weaponRelocationMode && def.category !== 'weapon'
   const colors = CATEGORY_COLORS[def.category]
   const tight = w * h <= 1
 
-  const borderColor = hasError ? '#e0524d' : selected ? '#e8c66a' : colors.border
+  const borderColor = hasError ? '#e0524d' : damaged ? '#f59e0b' : selected ? '#e8c66a' : colors.border
   const glow = hasError
     ? '0 0 9px rgba(224,82,77,.5)'
+    : damaged
+      ? '0 0 12px rgba(245,158,11,.55)'
     : selected || weaponFocus
       ? '0 0 12px rgba(232,198,106,.65)'
       : 'none'
@@ -268,6 +283,11 @@ function PlacedBlock({ inst, def }: { inst: ModuleInstance; def: ModuleDef }) {
       )}
       {def.weaponSize && tight && <span className="absolute bottom-0.5 right-0.5 text-[8px] font-bold uppercase text-white/75">{def.weaponSize.slice(0, 1)}</span>}
       {hasError && <span className="absolute right-0.5 top-0.5 text-[10px] text-danger">⚠</span>}
+      {damaged && (
+        <span className="absolute left-1 top-1 rounded-sm bg-amber-500/90 px-1 text-[10px] font-bold text-black shadow">
+          {damage}%
+        </span>
+      )}
       {inst.rotated && <span className="absolute bottom-0.5 left-0.5 text-[8px] text-white/60">⟳</span>}
     </div>
   )
@@ -280,6 +300,7 @@ function Legend() {
       <LegendItem color="rgba(224,169,77,0.5)" label="неверный тип клетки" />
       <LegendItem color="rgba(224,82,77,0.5)" label="занято / не помещается" />
       <LegendItem color="#e8c66a" label="выбранный модуль" border />
+      <LegendItem color="#f59e0b" label="повреждено" border />
       <LegendItem color="#e0524d" label="модуль с ошибкой" border />
     </div>
   )

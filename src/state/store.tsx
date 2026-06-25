@@ -39,6 +39,10 @@ export type Action =
   | { type: 'CLEAR_SHIPYARD' }
   | { type: 'BUY_OFFER'; offerId: string }
   | { type: 'FIRE_WEAPON'; instanceId: string }
+  | { type: 'DAMAGE_MODULE'; instanceId: string; amount?: number }
+  | { type: 'REPAIR_MODULE'; instanceId: string }
+  | { type: 'DAMAGE_CELL'; x: number; y: number; amount?: number }
+  | { type: 'REPAIR_CELL'; x: number; y: number }
   | { type: 'BUY_EXPANSION'; defId: string }
   | { type: 'PLACE_INSTANCE'; instanceId: string; x: number; y: number }
   | { type: 'AUTO_PLACE_WEAPONS' }
@@ -181,6 +185,166 @@ function autoPlaceWeapons(state: GameState): GameState {
     instances: state.instances.map((i) => placedWeapons.get(i.instanceId) ?? i),
     log: pushLog(state, `Орудия быстро расставлены: ${placedWeapons.size} шт.`, 'build'),
   }
+}
+
+const CATEGORY_DAMAGE: Record<Category, number> = {
+  weapon: 16,
+  command: 14,
+  generator: 28,
+  energy: 22,
+  weapon_support: 12,
+  storage: 10,
+  anchor: 14,
+  defense: 18,
+  movement: 24,
+  repair: 12,
+  boarding: 10,
+  room: 8,
+  hull_upgrade: 26,
+  sails: 18,
+  expansion: 20,
+}
+
+const CELL_DAMAGE: Record<string, number> = {
+  'Нос': 18,
+  'Корма': 18,
+  'Левый борт': 14,
+  'Правый борт': 14,
+  'Центр': 16,
+  'Киль': 30,
+  'Внутренний отсек': 12,
+  'Палуба': 10,
+}
+
+function damageKey(x: number, y: number): string {
+  return `${x},${y}`
+}
+
+function clampDamage(v: number): number {
+  if (!Number.isFinite(v)) return 0
+  return Math.max(0, Math.min(100, Math.round(v)))
+}
+
+function repairCost(damage: number, def?: ModuleDef): number {
+  const size = def?.weaponSize === 'superHeavy' ? 2 : def?.weaponSize === 'heavy' ? 1 : 0
+  return Math.max(1, Math.ceil(Math.max(1, damage) / 25) + size)
+}
+
+function syncHpForMaxChange(prev: GameState, next: GameState): GameState {
+  const before = computeDerived(prev).maxHP
+  const after = computeDerived(next).maxHP
+  const delta = after - before
+  if (delta === 0) return { ...next, currentHP: Math.min(next.currentHP, after) }
+  return { ...next, currentHP: Math.max(0, Math.min(after, next.currentHP + delta)) }
+}
+
+function clampHpToMax(state: GameState): GameState {
+  return { ...state, currentHP: Math.max(0, Math.min(state.currentHP, computeDerived(state).maxHP)) }
+}
+
+function applyModuleDamage(state: GameState, instanceId: string, amount = 25): GameState {
+  const inst = state.instances.find((i) => i.instanceId === instanceId)
+  const def = inst ? state.catalog.find((d) => d.id === inst.defId) : null
+  if (!inst || !def || !inst.placed) return state
+  const prevDamage = clampDamage(state.moduleDamage[instanceId] ?? 0)
+  const nextDamage = clampDamage(prevDamage + amount)
+  const hullDamage = Math.max(1, Math.round((CATEGORY_DAMAGE[def.category] ?? 12) * (amount / 25) + def.weight * 2))
+  const resources = { ...state.resources }
+  let currentEnergy = state.currentEnergy
+  const notes: string[] = []
+
+  if (def.category === 'generator' || def.category === 'energy') {
+    const lost = Math.min(currentEnergy, Math.max(1, Math.ceil(hullDamage / 3)))
+    currentEnergy -= lost
+    notes.push(`потеряно ${lost} МЭ`)
+  }
+  if (def.category === 'storage') {
+    const cargoLost = Math.min(resources.cargo, Math.max(1, Math.ceil(hullDamage / 10)))
+    const foodLost = Math.min(resources.food, Math.max(0, Math.floor(hullDamage / 12)))
+    resources.cargo = clampResource(resources.cargo - cargoLost)
+    resources.food = clampResource(resources.food - foodLost)
+    if (cargoLost || foodLost) notes.push(`потери склада: груз ${cargoLost}, еда ${foodLost}`)
+  }
+  if (def.category === 'weapon') {
+    const ammoLost = Math.min(resources.ammo, Math.max(0, Math.floor(hullDamage / 12)))
+    const magicLost = Math.min(resources.magicAmmo, (def.energyCost ?? 0) > 0 ? 1 : 0)
+    resources.ammo = clampResource(resources.ammo - ammoLost)
+    resources.magicAmmo = clampResource(resources.magicAmmo - magicLost)
+    if (ammoLost || magicLost) notes.push(`боезапас поврежден: ${ammoLost + magicLost}`)
+  }
+
+  const next = clampHpToMax({
+    ...state,
+    currentHP: Math.max(0, state.currentHP - hullDamage),
+    currentEnergy,
+    resources,
+    moduleDamage: { ...state.moduleDamage, [instanceId]: nextDamage },
+  })
+
+  return {
+    ...next,
+    log: pushLog(
+      next,
+      `Поврежден модуль: ${def.name}. Повреждение ${prevDamage} -> ${nextDamage}. Корабль получил ${hullDamage} урона${notes.length ? `. ${notes.join('; ')}` : ''}.`,
+      nextDamage >= 100 ? 'error' : 'warn',
+    ),
+  }
+}
+
+function repairModule(state: GameState, instanceId: string): GameState {
+  const inst = state.instances.find((i) => i.instanceId === instanceId)
+  const def = inst ? state.catalog.find((d) => d.id === inst.defId) : null
+  const damage = clampDamage(state.moduleDamage[instanceId] ?? 0)
+  if (!inst || !def || damage <= 0) return state
+  const cost = repairCost(damage, def)
+  if (state.resources.repairMaterials < cost) {
+    return { ...state, log: pushLog(state, `Не хватает ремкомплектов для ремонта: нужно ${cost}.`, 'warn') }
+  }
+  const moduleDamage = { ...state.moduleDamage }
+  delete moduleDamage[instanceId]
+  const next = syncHpForMaxChange(state, {
+    ...state,
+    moduleDamage,
+    resources: { ...state.resources, repairMaterials: clampResource(state.resources.repairMaterials - cost) },
+  })
+  return { ...next, log: pushLog(next, `Модуль отремонтирован: ${def.name}. Потрачено ремкомплектов: ${cost}.`, 'build') }
+}
+
+function applyCellDamage(state: GameState, x: number, y: number, amount = 25): GameState {
+  const derived = computeDerived(state)
+  if (x < 0 || y < 0 || x >= derived.cols || y >= derived.rows) return state
+  const cell = derived.grid[y][x]
+  const k = damageKey(x, y)
+  const prevDamage = clampDamage(state.cellDamage[k] ?? 0)
+  const nextDamage = clampDamage(prevDamage + amount)
+  const hullDamage = Math.max(1, Math.round((CELL_DAMAGE[cell.type] ?? 12) * (amount / 25)))
+  const next = clampHpToMax({
+    ...state,
+    currentHP: Math.max(0, state.currentHP - hullDamage),
+    cellDamage: { ...state.cellDamage, [k]: nextDamage },
+  })
+  return {
+    ...next,
+    log: pushLog(next, `Поврежден слот ${x + 1}:${y + 1} (${cell.type}). Повреждение ${prevDamage} -> ${nextDamage}. Корабль получил ${hullDamage} урона.`, nextDamage >= 100 ? 'error' : 'warn'),
+  }
+}
+
+function repairCell(state: GameState, x: number, y: number): GameState {
+  const k = damageKey(x, y)
+  const damage = clampDamage(state.cellDamage[k] ?? 0)
+  if (damage <= 0) return state
+  const cost = repairCost(damage)
+  if (state.resources.repairMaterials < cost) {
+    return { ...state, log: pushLog(state, `Не хватает ремкомплектов для ремонта слота: нужно ${cost}.`, 'warn') }
+  }
+  const cellDamage = { ...state.cellDamage }
+  delete cellDamage[k]
+  const next = syncHpForMaxChange(state, {
+    ...state,
+    cellDamage,
+    resources: { ...state.resources, repairMaterials: clampResource(state.resources.repairMaterials - cost) },
+  })
+  return { ...next, log: pushLog(next, `Слот ${x + 1}:${y + 1} отремонтирован. Потрачено ремкомплектов: ${cost}.`, 'build') }
 }
 
 function footprint(inst: ModuleInstance, def: ModuleDef): Array<{ x: number; y: number }> {
@@ -341,7 +505,7 @@ export function reducer(state: GameState, action: Action): GameState {
       if (def.category === 'expansion') {
         const applied = applyExpansion(state, def)
         if (applied === state) return state // не куплено
-        return { ...applied, shipyardOffers: remaining }
+        return syncHpForMaxChange(state, { ...applied, shipyardOffers: remaining })
       }
 
       const cost = def.price + def.installCost
@@ -361,86 +525,99 @@ export function reducer(state: GameState, action: Action): GameState {
       if (!def || def.category !== 'expansion') return state
       const applied = applyExpansion(state, def)
       if (applied === state) return state
-      return {
+      return syncHpForMaxChange(state, {
         ...applied,
         shipyardOffers: state.shipyardOffers.filter((o) => o.type === 'resource' || o.type === 'cargo_sale' || o.defId !== def.id),
-      }
+      })
     }
 
     case 'FIRE_WEAPON':
       return fireWeapon(state, action.instanceId)
 
+    case 'DAMAGE_MODULE':
+      return applyModuleDamage(state, action.instanceId, action.amount)
+
+    case 'REPAIR_MODULE':
+      return repairModule(state, action.instanceId)
+
+    case 'DAMAGE_CELL':
+      return applyCellDamage(state, action.x, action.y, action.amount)
+
+    case 'REPAIR_CELL':
+      return repairCell(state, action.x, action.y)
+
     case 'PLACE_INSTANCE':
-      return {
+      return syncHpForMaxChange(state, {
         ...state,
         instances: state.instances.map((i) =>
           i.instanceId === action.instanceId ? { ...i, placed: true, x: action.x, y: action.y } : i,
         ),
         selectedInstanceId: action.instanceId,
-      }
+      })
 
     case 'AUTO_PLACE_WEAPONS':
       return autoPlaceWeapons(state)
 
     case 'INSTALL_UPGRADE':
-      return {
+      return syncHpForMaxChange(state, {
         ...state,
         instances: state.instances.map((i) =>
           i.instanceId === action.instanceId ? { ...i, placed: true, x: undefined, y: undefined } : i,
         ),
         selectedInstanceId: action.instanceId,
-      }
+      })
 
     case 'UNPLACE_INSTANCE':
-      return {
+      return syncHpForMaxChange(state, {
         ...state,
         instances: state.instances.map((i) =>
           i.instanceId === action.instanceId ? { ...i, placed: false, x: undefined, y: undefined } : i,
         ),
-      }
+      })
 
     case 'ROTATE_INSTANCE':
-      return {
+      return syncHpForMaxChange(state, {
         ...state,
         instances: state.instances.map((i) =>
           i.instanceId === action.instanceId ? { ...i, rotated: !i.rotated } : i,
         ),
-      }
+      })
 
     case 'SELECT_INSTANCE':
       return { ...state, selectedInstanceId: action.instanceId }
 
     case 'DELETE_INSTANCE':
-      return {
+      return syncHpForMaxChange(state, {
         ...state,
         instances: state.instances.filter((i) => i.instanceId !== action.instanceId),
+        moduleDamage: Object.fromEntries(Object.entries(state.moduleDamage).filter(([id]) => id !== action.instanceId)),
         selectedInstanceId: state.selectedInstanceId === action.instanceId ? null : state.selectedInstanceId,
-      }
+      })
 
     case 'SET_BASE':
-      return { ...state, ...action.partial }
+      return syncHpForMaxChange(state, { ...state, ...action.partial })
 
     case 'UPDATE_MODULE_DEF':
-      return {
+      return syncHpForMaxChange(state, {
         ...state,
         catalog: state.catalog.map((d) => (d.id === action.def.id ? action.def : d)),
-      }
+      })
 
     case 'ADD_MODULE_DEF':
       return { ...state, catalog: [...state.catalog, action.def] }
 
     case 'DELETE_MODULE_DEF':
-      return {
+      return syncHpForMaxChange(state, {
         ...state,
         catalog: state.catalog.filter((d) => d.id !== action.id),
         instances: state.instances.filter((i) => i.defId !== action.id),
-      }
+      })
 
     case 'RESET_CATALOG':
       return { ...state, catalog: cloneCatalog(), log: pushLog(state, 'Каталог сброшен к базовым данным.', 'system') }
 
     case 'IMPORT_CATALOG':
-      return { ...state, catalog: action.catalog }
+      return syncHpForMaxChange(state, { ...state, catalog: action.catalog })
 
     case 'LOG':
       return { ...state, log: pushLog(state, action.text, action.kind) }

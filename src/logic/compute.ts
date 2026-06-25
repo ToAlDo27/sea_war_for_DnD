@@ -94,6 +94,8 @@ export function computeDerived(state: GameState): DerivedState {
   const addErr = (id: string, e: string) => {
     ;(errorsByInstance[id] ||= []).push(e)
   }
+  const cellDamageAt = (x: number, y: number): number => Math.max(0, Math.min(100, state.cellDamage?.[key(x, y)] ?? 0))
+  const moduleDamageAt = (id: string): number => Math.max(0, Math.min(100, state.moduleDamage?.[id] ?? 0))
 
   for (const inst of gridInstances) {
     const def = defMap.get(inst.defId)!
@@ -114,7 +116,18 @@ export function computeDerived(state: GameState): DerivedState {
   for (const inst of gridInstances) {
     const def = defMap.get(inst.defId)!
     const cells = footprints[inst.instanceId].cells
+    const moduleDamage = moduleDamageAt(inst.instanceId)
+    const slotDamage = Math.max(0, ...cells.map((c) => (inBounds(c, rows, cols) ? cellDamageAt(c.x, c.y) : 0)))
     let ok = true
+
+    if (moduleDamage >= 100) {
+      addErr(inst.instanceId, 'Модуль выведен из строя')
+      ok = false
+    }
+    if (slotDamage >= 100) {
+      addErr(inst.instanceId, 'Слот корпуса выведен из строя')
+      ok = false
+    }
 
     // 1. Помещается ли в границы
     const outOfBounds = cells.some((c) => c.x < 0 || c.y < 0 || c.x >= cols || c.y >= rows)
@@ -198,6 +211,13 @@ export function computeDerived(state: GameState): DerivedState {
     requirementsOk[inst.instanceId] = checkReqs(inst, def)
   }
 
+  const damageOk: Record<string, boolean> = {}
+  for (const inst of [...gridInstances, ...upgradeInstances]) {
+    const damage = moduleDamageAt(inst.instanceId)
+    damageOk[inst.instanceId] = damage < 100
+    if (damage >= 100) addErr(inst.instanceId, 'Модуль выведен из строя')
+  }
+
   // ---- Батареи (энергозапас) от рабочих энергомодулей ----
   for (const inst of gridInstances) {
     const def = defMap.get(inst.defId)!
@@ -220,10 +240,10 @@ export function computeDerived(state: GameState): DerivedState {
 
   const working: Record<string, boolean> = {}
   for (const inst of gridInstances) {
-    working[inst.instanceId] = structuralOk[inst.instanceId] && requirementsOk[inst.instanceId] && energyOk[inst.instanceId]
+    working[inst.instanceId] = structuralOk[inst.instanceId] && requirementsOk[inst.instanceId] && energyOk[inst.instanceId] && damageOk[inst.instanceId]
   }
   for (const inst of upgradeInstances) {
-    working[inst.instanceId] = requirementsOk[inst.instanceId] && energyOk[inst.instanceId]
+    working[inst.instanceId] = requirementsOk[inst.instanceId] && energyOk[inst.instanceId] && damageOk[inst.instanceId]
   }
 
   // ---- Лимиты орудий ----
@@ -337,7 +357,7 @@ export function computeDerived(state: GameState): DerivedState {
   for (let y = 0; y < rows; y++) {
     const row: GridCell[] = []
     for (let x = 0; x < cols; x++) {
-      row.push({ x, y, type: types[y][x], occupiedBy: occupancyOwner[key(x, y)] ?? null })
+      row.push({ x, y, type: types[y][x], damage: cellDamageAt(x, y), occupiedBy: occupancyOwner[key(x, y)] ?? null })
     }
     grid.push(row)
   }
@@ -348,10 +368,14 @@ export function computeDerived(state: GameState): DerivedState {
     const def = defMap.get(inst.defId)
     if (!def) continue
     const installed = inst.placed && (def.cells === 0 || (inst.x != null && inst.y != null))
+    const fp = footprints[inst.instanceId]
+    const slotDamage = fp ? Math.max(0, ...fp.cells.map((c) => (inBounds(c, rows, cols) ? cellDamageAt(c.x, c.y) : 0))) : 0
+    const damage = Math.max(moduleDamageAt(inst.instanceId), slotDamage)
     moduleStatus[inst.instanceId] = {
       instanceId: inst.instanceId,
       installed,
       working: installed ? !!working[inst.instanceId] : false,
+      damage,
       errors: errorsByInstance[inst.instanceId] ?? [],
     }
   }

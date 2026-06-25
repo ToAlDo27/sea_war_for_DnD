@@ -29,6 +29,8 @@ export function normalizeState(raw: unknown): GameState {
     resources,
     catalog,
     instances,
+    moduleDamage: normalizeDamageMap(p.moduleDamage),
+    cellDamage: normalizeDamageMap(p.cellDamage),
     ui: { ...base.ui, ...(p.ui ?? {}) },
     log: Array.isArray(p.log) ? p.log.slice(-200) : base.log,
     shipyardOffers: Array.isArray(p.shipyardOffers) ? p.shipyardOffers : [],
@@ -60,6 +62,17 @@ function numOr(v: unknown, fallback: number): number {
 function clampLvl(v: unknown): number {
   const n = typeof v === 'number' ? v : 0
   return Math.max(0, Math.min(5, Math.floor(n)))
+}
+
+function normalizeDamageMap(v: unknown): Record<string, number> {
+  if (!v || typeof v !== 'object') return {}
+  const out: Record<string, number> = {}
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) continue
+    const damage = Math.max(0, Math.min(100, Math.round(raw)))
+    if (damage > 0) out[k] = damage
+  }
+  return out
 }
 
 export function saveState(state: GameState): boolean {
