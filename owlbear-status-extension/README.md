@@ -6,13 +6,13 @@
 
 ## Онлайн-версия
 
-После деплоя GitHub Pages добавьте расширение в Owlbear по ссылке:
+Добавьте расширение в Owlbear по ссылке:
 
 ```text
-https://ToAlDo27.github.io/sea_war_for_DnD/manifest.json
+https://raw.githack.com/ToAlDo27/sea_war_for_DnD/main/owlbear-status-extension/manifest.json
 ```
 
-Если репозиторий или Pages-адрес отличается, используйте адрес GitHub Pages именно этого репозитория и добавьте `/manifest.json` в конце.
+Этот адрес берёт файлы прямо из ветки `main` на GitHub и отдаёт их по HTTPS с корректным типом `text/html` для панели расширения.
 
 ## Запуск
 
