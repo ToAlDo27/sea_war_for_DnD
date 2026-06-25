@@ -6,16 +6,41 @@ import { CATEGORY_COLORS, CELL_SHORT, CELL_TINT, categoryBg } from '../ui/styles
 import type { ModuleDef, ModuleInstance } from '../types'
 import ModuleArt from './ModuleArt'
 
-const CELL = 170
+const MAX_CELL = 170
+const MIN_CELL = 76
 const PAD_LEFT = 260
 const PAD_RIGHT = 220
 const PAD_TOP = 80
 const PAD_BOTTOM = 90
 
+function useResponsiveCell(cols: number): number {
+  const calc = React.useCallback(() => {
+    if (typeof window === 'undefined') return MAX_CELL
+    const sidePadding = window.innerWidth >= 1280 ? 720 : 96
+    const available = Math.max(360, window.innerWidth - sidePadding - PAD_LEFT - PAD_RIGHT)
+    return Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor(available / Math.max(1, cols))))
+  }, [cols])
+
+  const [cell, setCell] = React.useState(calc)
+  React.useEffect(() => {
+    const onResize = () => setCell(calc())
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [calc])
+  return cell
+}
+
 export default function ShipGrid() {
   const { state, derived, defMap, dispatch, notify } = useStore()
   const dnd = useDnD()
   const { grid, rows, cols } = derived
+  const cellSize = useResponsiveCell(cols)
+  const stageWidth = cols * cellSize + PAD_LEFT + PAD_RIGHT
+  const stageHeight = rows * cellSize + PAD_TOP + PAD_BOTTOM
+  const length = Math.max(0, Math.min(5, Math.floor(state.lengthLevel)))
+  const mainRows = 6 + length * 2
+  const floorCount = Math.max(0, Math.min(5, Math.floor(state.heightLevel)))
 
   const draggingInst = dnd.draggingId ? state.instances.find((i) => i.instanceId === dnd.draggingId) : undefined
   const draggingDef = draggingInst ? defMap.get(draggingInst.defId) : undefined
@@ -115,27 +140,38 @@ export default function ShipGrid() {
       <div className="flex justify-center">
         <div
           className="ship-hull-stage relative"
-          style={{ width: cols * CELL + PAD_LEFT + PAD_RIGHT, height: rows * CELL + PAD_TOP + PAD_BOTTOM }}
+          style={{ width: stageWidth, height: stageHeight }}
           onDragLeave={() => dnd.setHover(null)}
         >
           <div
             className="ship-hull-shadow pointer-events-none absolute"
-            style={{ left: 0, top: 0, width: cols * CELL + PAD_LEFT + PAD_RIGHT, height: rows * CELL + PAD_TOP + PAD_BOTTOM }}
+            style={{ left: 0, top: 0, width: stageWidth, height: stageHeight }}
           />
           {/* Базовые клетки */}
+          <div className="pointer-events-none absolute z-10" style={{ left: PAD_LEFT - 96, top: PAD_TOP, width: 90, height: rows * cellSize }}>
+            <FloorLabel top={0} text="Этаж 1" hint="палуба" />
+            {Array.from({ length: floorCount }).map((_, i) => (
+              <FloorLabel key={i} top={(mainRows + i * 6) * cellSize} text={`Этаж ${i + 2}`} hint="6x6 отсек" />
+            ))}
+          </div>
+          <div className="pointer-events-none absolute z-10" style={{ left: PAD_LEFT, top: PAD_TOP, width: cols * cellSize, height: rows * cellSize }}>
+            {Array.from({ length: floorCount }).map((_, i) => (
+              <div key={i} className="absolute left-0 right-0 border-t-2 border-gold/60" style={{ top: (mainRows + i * 6) * cellSize }} />
+            ))}
+          </div>
           <div
             className="absolute grid"
             style={{
               left: PAD_LEFT,
               top: PAD_TOP,
-              gridTemplateColumns: `repeat(${cols}, ${CELL}px)`,
-              gridTemplateRows: `repeat(${rows}, ${CELL}px)`,
+              gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
+              gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
             }}
           >
             {grid.flat().map((cell) => (
               <div
                 key={`${cell.x},${cell.y}`}
-                className={`relative border border-rune/25 ${activePlacementId ? 'cursor-crosshair' : ''}`}
+                className={`relative border ${cell.type === 'Пусто' ? 'pointer-events-none border-transparent' : `border-rune/25 ${activePlacementId ? 'cursor-crosshair' : ''}`}`}
                 style={{
                   background:
                     cell.damage > 0
@@ -156,7 +192,7 @@ export default function ShipGrid() {
                 }}
                 onDrop={(e) => handleDrop(cell.x, cell.y, e)}
               >
-                {state.ui.showGridLabels && (
+                {state.ui.showGridLabels && cell.type !== 'Пусто' && (
                   <span className="pointer-events-none absolute left-1 top-1 text-[10px] font-bold uppercase tracking-tight text-slate-300/75">
                     {CELL_SHORT[cell.type]}
                   </span>
@@ -172,7 +208,7 @@ export default function ShipGrid() {
 
           {/* Превью размещения */}
           {preview && (
-            <div className="pointer-events-none absolute" style={{ left: PAD_LEFT, top: PAD_TOP, width: cols * CELL, height: rows * CELL }}>
+            <div className="pointer-events-none absolute" style={{ left: PAD_LEFT, top: PAD_TOP, width: cols * cellSize, height: rows * cellSize }}>
               {preview.cells
                 .filter((c) => c.inBounds)
                 .map((c) => {
@@ -188,10 +224,10 @@ export default function ShipGrid() {
                       key={`p-${c.x},${c.y}`}
                       className="absolute border-2"
                       style={{
-                        left: c.x * CELL,
-                        top: c.y * CELL,
-                        width: CELL,
-                        height: CELL,
+                        left: c.x * cellSize,
+                        top: c.y * cellSize,
+                        width: cellSize,
+                        height: cellSize,
                         background: bg,
                         borderColor: preview.valid ? '#34e2a0' : '#e0524d',
                       }}
@@ -202,9 +238,9 @@ export default function ShipGrid() {
           )}
 
           {/* Установленные модули */}
-          <div className="pointer-events-none absolute" style={{ left: PAD_LEFT, top: PAD_TOP, width: cols * CELL, height: rows * CELL }}>
+          <div className="pointer-events-none absolute" style={{ left: PAD_LEFT, top: PAD_TOP, width: cols * cellSize, height: rows * cellSize }}>
             {placedBlocks.map((inst) => (
-              <PlacedBlock key={inst.instanceId} inst={inst} def={defMap.get(inst.defId)!} />
+              <PlacedBlock key={inst.instanceId} inst={inst} def={defMap.get(inst.defId)!} cellSize={cellSize} />
             ))}
           </div>
         </div>
@@ -215,7 +251,16 @@ export default function ShipGrid() {
   )
 }
 
-function PlacedBlock({ inst, def }: { inst: ModuleInstance; def: ModuleDef }) {
+function FloorLabel({ top, text, hint }: { top: number; text: string; hint: string }) {
+  return (
+    <div className="absolute right-0 rounded border border-gold/45 bg-black/60 px-2 py-1 text-right shadow" style={{ top }}>
+      <div className="font-display text-[11px] text-gold">{text}</div>
+      <div className="text-[8px] uppercase text-slate-400">{hint}</div>
+    </div>
+  )
+}
+
+function PlacedBlock({ inst, def, cellSize }: { inst: ModuleInstance; def: ModuleDef; cellSize: number }) {
   const { state, derived, dispatch } = useStore()
   const dnd = useDnD()
   const { w, h } = effectiveSize(def, inst.rotated)
@@ -225,16 +270,17 @@ function PlacedBlock({ inst, def }: { inst: ModuleInstance; def: ModuleDef }) {
   const damaged = damage > 0
   const selected = state.selectedInstanceId === inst.instanceId
   const weaponFocus = state.ui.weaponRelocationMode && def.category === 'weapon'
-  const dimNonWeapon = state.ui.weaponRelocationMode && def.category !== 'weapon'
   const colors = CATEGORY_COLORS[def.category]
   const tight = w * h <= 1
 
-  const borderColor = hasError ? '#e0524d' : damaged ? '#f59e0b' : selected ? '#e8c66a' : colors.border
+  const borderColor = hasError ? '#e0524d' : selected ? '#fff3a3' : damaged ? '#f59e0b' : colors.border
   const glow = hasError
     ? '0 0 9px rgba(224,82,77,.5)'
+    : selected
+      ? '0 0 0 3px rgba(255,243,163,.42), 0 0 24px rgba(255,212,92,.95), inset 0 0 24px rgba(255,243,163,.18)'
     : damaged
       ? '0 0 12px rgba(245,158,11,.55)'
-    : selected || weaponFocus
+    : weaponFocus
       ? '0 0 12px rgba(232,198,106,.65)'
       : 'none'
 
@@ -257,15 +303,16 @@ function PlacedBlock({ inst, def }: { inst: ModuleInstance; def: ModuleDef }) {
       }}
       className="absolute flex cursor-grab flex-col items-center justify-center overflow-hidden rounded-sm p-0.5 text-center active:cursor-grabbing"
       style={{
-        left: (inst.x ?? 0) * CELL + 1,
-        top: (inst.y ?? 0) * CELL + 1,
-        width: w * CELL - 2,
-        height: h * CELL - 2,
+        left: (inst.x ?? 0) * cellSize + 1,
+        top: (inst.y ?? 0) * cellSize + 1,
+        width: w * cellSize - 2,
+        height: h * cellSize - 2,
         background: categoryBg(def.category, 0.9),
-        border: `2px solid ${borderColor}`,
+        border: `${selected ? 4 : 2}px solid ${borderColor}`,
         boxShadow: glow,
         pointerEvents: dnd.draggingId === inst.instanceId ? 'none' : 'auto',
-        opacity: dimNonWeapon ? 0.42 : status && !status.working ? 0.78 : 1,
+        opacity: hasError ? 0.58 : 1,
+        zIndex: selected ? 30 : hasError ? 20 : 10,
       }}
       title={`${def.name}${hasError ? '\n⚠ ' + status!.errors.join('\n⚠ ') : ''}`}
     >

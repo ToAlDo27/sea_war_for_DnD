@@ -59,7 +59,7 @@ export function generateShipyard(state: GameState): ShipyardOffer[] {
   const pool = buildShipyardPool(state)
 
   const moduleCount = pool.length === 0 ? 0 : 1 + Math.floor(Math.random() * 6) // 1..6
-  const resourceCount = 2 + Math.floor(Math.random() * 4) // 2..5
+  const resourceCount = randomResourceOfferCount()
   const offers: ShipyardOffer[] = []
   const usedUnique = new Set<string>()
   let attempts = 0
@@ -88,7 +88,8 @@ export function generateShipyard(state: GameState): ShipyardOffer[] {
     })
   }
   if (state.resources.cargo > 0 && Math.random() < 0.75) {
-    const quantity = 1 + Math.floor(Math.random() * Math.min(30, state.resources.cargo))
+    const wanted = 10 + Math.floor(Math.random() * 991)
+    const quantity = Math.max(1, Math.min(wanted, state.resources.cargo))
     const unitPrice = 12 + Math.floor(Math.random() * 49)
     offers.push({
       offerId: uid('offer'),
@@ -98,4 +99,11 @@ export function generateShipyard(state: GameState): ShipyardOffer[] {
     })
   }
   return offers
+}
+
+function randomResourceOfferCount(): number {
+  const roll = Math.random()
+  if (roll < 0.72) return 2 + Math.floor(Math.random() * 5) // 2..6
+  if (roll < 0.96) return 7 + Math.floor(Math.random() * 3) // 7..9
+  return 10 + Math.floor(Math.random() * 3) // 10..12
 }

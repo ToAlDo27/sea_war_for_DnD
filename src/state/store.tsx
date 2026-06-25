@@ -39,6 +39,7 @@ export type Action =
   | { type: 'CLEAR_SHIPYARD' }
   | { type: 'BUY_OFFER'; offerId: string }
   | { type: 'FIRE_WEAPON'; instanceId: string }
+  | { type: 'USE_MODULE_ENERGY'; instanceId: string }
   | { type: 'DAMAGE_MODULE'; instanceId: string; amount?: number }
   | { type: 'REPAIR_MODULE'; instanceId: string }
   | { type: 'DAMAGE_CELL'; x: number; y: number; amount?: number }
@@ -184,6 +185,27 @@ function autoPlaceWeapons(state: GameState): GameState {
     ...state,
     instances: state.instances.map((i) => placedWeapons.get(i.instanceId) ?? i),
     log: pushLog(state, `Орудия быстро расставлены: ${placedWeapons.size} шт.`, 'build'),
+  }
+}
+
+function useModuleEnergy(state: GameState, instanceId: string): GameState {
+  const inst = state.instances.find((i) => i.instanceId === instanceId)
+  const def = inst ? state.catalog.find((d) => d.id === inst.defId) : null
+  if (!inst || !def || def.category === 'weapon') return state
+  const cost = def.energyCost ?? 0
+  if (cost <= 0) return { ...state, log: pushLog(state, `${def.name}: модуль не требует расхода МЭ.`, 'info') }
+  const derived = computeDerived(state)
+  const status = derived.moduleStatus[instanceId]
+  if (!status?.installed || status.errors.length > 0) {
+    return { ...state, log: pushLog(state, `Расход МЭ заблокирован: ${def.name}. Модуль не готов к работе.`, 'warn') }
+  }
+  if (state.currentEnergy < cost) {
+    return { ...state, log: pushLog(state, `Недостаточно МЭ для ${def.name}: нужно ${cost}, доступно ${state.currentEnergy}.`, 'warn') }
+  }
+  return {
+    ...state,
+    currentEnergy: Math.max(0, state.currentEnergy - cost),
+    log: pushLog(state, `${def.name}: потрачено ${cost} МЭ. Осталось ${state.currentEnergy - cost}.`, 'build'),
   }
 }
 
@@ -533,6 +555,9 @@ export function reducer(state: GameState, action: Action): GameState {
 
     case 'FIRE_WEAPON':
       return fireWeapon(state, action.instanceId)
+
+    case 'USE_MODULE_ENERGY':
+      return useModuleEnergy(state, action.instanceId)
 
     case 'DAMAGE_MODULE':
       return applyModuleDamage(state, action.instanceId, action.amount)

@@ -23,7 +23,7 @@ export default function App() {
       <main className="px-2">
         {tab === 'ship' && (
           <DnDProvider>
-            <div className="grid grid-cols-1 gap-2 xl:grid-cols-[300px_minmax(920px,1fr)_320px] 2xl:grid-cols-[320px_minmax(1180px,1fr)_340px]">
+            <div className="grid grid-cols-1 gap-2 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_300px]">
               <div className="space-y-2">
                 <StatusPanel />
                 <ResourcePanel />

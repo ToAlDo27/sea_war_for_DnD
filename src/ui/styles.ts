@@ -44,6 +44,7 @@ export const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'very_rare'
 
 // Короткие подписи типов клеток для отрисовки
 export const CELL_SHORT: Record<string, string> = {
+  Пусто: '',
   Нос: 'НОС',
   Корма: 'КОРМ',
   'Левый борт': 'ЛБ',
@@ -56,6 +57,7 @@ export const CELL_SHORT: Record<string, string> = {
 
 // Цвет фона клетки по типу (чертёжный)
 export const CELL_TINT: Record<string, string> = {
+  Пусто: 'transparent',
   Нос: 'rgba(95, 179, 196, 0.10)',
   Корма: 'rgba(95, 179, 196, 0.10)',
   'Левый борт': 'rgba(176, 122, 60, 0.10)',

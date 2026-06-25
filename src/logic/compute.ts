@@ -73,7 +73,7 @@ export function computeDerived(state: GameState): DerivedState {
   const defMap = getDefMap(state.catalog)
   const layout = generateGrid(state.lengthLevel, state.widthLevel, state.heightLevel)
   const { rows, cols, types } = layout
-  const totalCells = rows * cols
+  const totalCells = types.flat().filter((type) => type !== 'Пусто').length
 
   // ---- Разделяем экземпляры на сеточные и бесклеточные апгрейды ----
   const gridInstances: ModuleInstance[] = []

@@ -12,7 +12,7 @@ export default function SelectedModulePanel() {
 
   if (!inst || !def) {
     return (
-      <div className="panel">
+      <div className="panel sticky top-24 max-h-[calc(100vh-7rem)]">
         <SectionTitle>Выбранный модуль</SectionTitle>
         <p className="px-3 py-6 text-center text-[11px] text-slate-500">Модуль не выбран. Кликните на модуль в сетке или инвентаре.</p>
       </div>
@@ -29,6 +29,7 @@ export default function SelectedModulePanel() {
   const slotDamage = Math.max(0, ...cellKeys.map((k) => state.cellDamage[k] ?? 0))
   const repairCost = Math.max(1, Math.ceil(Math.max(1, moduleDamage) / 25) + (def.weaponSize === 'superHeavy' ? 2 : def.weaponSize === 'heavy' ? 1 : 0))
   const slotRepairCost = Math.max(1, Math.ceil(Math.max(1, slotDamage) / 25))
+  const canSpendEnergy = placed && def.category !== 'weapon' && (def.energyCost ?? 0) > 0 && state.currentEnergy >= (def.energyCost ?? 0) && errors.length === 0
 
   const statusText = !placed ? 'Не установлен' : working ? 'Установлен корректно' : 'Установлен с ошибками'
   const statusColor = !placed ? '#9aa7b3' : working ? '#7fe8b0' : '#f0908c'
@@ -56,7 +57,7 @@ export default function SelectedModulePanel() {
   if (slotDamage > 0) rows.push(['Повреждение слота', `${slotDamage}%`])
 
   return (
-    <div className="panel flex min-h-0 flex-col">
+    <div className="panel sticky top-24 flex max-h-[calc(100vh-7rem)] min-h-0 flex-col">
       <SectionTitle>Выбранный модуль</SectionTitle>
       <div className="min-h-0 flex-1 overflow-auto p-3" style={{ borderTop: `2px solid ${colors.border}` }}>
         <div className="mb-2 flex items-start gap-3">
@@ -101,6 +102,9 @@ export default function SelectedModulePanel() {
 
         {/* Действия */}
         <div className="mt-3 flex flex-wrap gap-1.5">
+          <button className="btn px-2 py-1 text-[11px]" onClick={() => dispatch({ type: 'SELECT_INSTANCE', instanceId: null })}>
+            Снять выделение
+          </button>
           {def.rotatable && (
             <button className="btn px-2 py-1 text-[11px]" onClick={() => dispatch({ type: 'ROTATE_INSTANCE', instanceId: inst.instanceId })}>
               ⟳ Повернуть
@@ -116,6 +120,16 @@ export default function SelectedModulePanel() {
             </button>
           ) : (
             <span className="text-[10px] text-slate-500">Перетащите модуль на сетку для установки.</span>
+          )}
+          {placed && def.category !== 'weapon' && (def.energyCost ?? 0) > 0 && (
+            <button
+              className="btn btn-rune px-2 py-1 text-[11px]"
+              onClick={() => dispatch({ type: 'USE_MODULE_ENERGY', instanceId: inst.instanceId })}
+              disabled={!canSpendEnergy}
+              title={`Расход: ${def.energyCost} МЭ`}
+            >
+              Использовать МЭ ({def.energyCost})
+            </button>
           )}
           {placed && (
             <>
