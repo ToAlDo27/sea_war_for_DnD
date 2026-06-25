@@ -1,0 +1,246 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: #1f1209;
+    background-image:
+      radial-gradient(circle at 18% 8%, rgba(170, 96, 38, 0.28), transparent 42%),
+      radial-gradient(circle at 82% 92%, rgba(86, 42, 18, 0.32), transparent 50%),
+      repeating-linear-gradient(0deg, rgba(255, 214, 150, 0.025) 0 1px, transparent 1px 7px),
+      linear-gradient(#2a160b, #120905);
+    background-attachment: fixed;
+    color: #cdd9e6;
+    font-family: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: Georgia, 'Times New Roman', serif;
+    letter-spacing: 0.04em;
+  }
+}
+
+@layer components {
+  /* Чертёжная сетка-фон для панелей */
+  .blueprint {
+    background-color: #2b170c;
+    background-image:
+      radial-gradient(circle at 20% 12%, rgba(237, 166, 78, 0.11), transparent 38%),
+      linear-gradient(rgba(232, 168, 91, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232, 168, 91, 0.045) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .ship-hull-stage {
+    isolation: isolate;
+  }
+
+  .ship-hull-shadow {
+    overflow: hidden;
+    clip-path: polygon(0% 50%, 8% 26%, 22% 12%, 40% 6%, 72% 8%, 92% 22%, 99% 39%, 99% 61%, 92% 78%, 72% 92%, 40% 94%, 22% 88%, 8% 74%);
+    border-radius: 50% 18% 18% 50% / 50% 24% 24% 50%;
+    background:
+      linear-gradient(90deg, transparent 0 4%, rgba(255, 215, 132, 0.16) 4% 5.2%, transparent 5.2% 94.8%, rgba(255, 215, 132, 0.16) 94.8% 96%, transparent 96%),
+      repeating-linear-gradient(90deg, rgba(118, 61, 24, 0.55) 0 2px, transparent 2px 38px),
+      repeating-linear-gradient(0deg, rgba(255, 223, 164, 0.08) 0 2px, transparent 2px 22px),
+      radial-gradient(ellipse at 50% 16%, rgba(255, 198, 88, 0.28), transparent 36%),
+      linear-gradient(180deg, rgba(122, 69, 31, 0.96), rgba(49, 24, 10, 0.96));
+    border: 3px solid rgba(230, 149, 70, 0.72);
+    box-shadow:
+      inset 0 0 46px rgba(0, 0, 0, 0.34),
+      inset 0 0 0 12px rgba(60, 28, 8, 0.38),
+      inset 0 -30px 58px rgba(36, 16, 5, 0.48),
+      0 0 30px rgba(170, 96, 38, 0.24);
+  }
+
+  .ship-hull-shadow::before,
+  .ship-hull-shadow::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .ship-hull-shadow::before {
+    inset: 14% 10% 14% 18%;
+    border: 4px solid rgba(255, 196, 95, 0.35);
+    border-radius: 48% 18% 18% 48% / 50% 22% 22% 50%;
+    box-shadow:
+      inset 0 0 26px rgba(0, 0, 0, 0.34),
+      0 0 14px rgba(255, 181, 84, 0.14);
+  }
+
+  .ship-hull-shadow::after {
+    left: 9%;
+    right: 7%;
+    top: 49%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, rgba(255, 210, 120, 0.42), transparent);
+    transform: translateY(-50%);
+  }
+
+  .module-art {
+    background-size: 100% 100%;
+    background-position: center;
+  }
+
+  .cannon-shot-art {
+    width: 28px;
+    height: 16px;
+    display: inline-block;
+    flex: 0 0 auto;
+    border-radius: 999px 6px 6px 999px;
+    background:
+      radial-gradient(circle at 88% 50%, rgba(255, 245, 160, 0.95) 0 15%, rgba(255, 120, 40, 0.92) 16% 32%, transparent 34%),
+      radial-gradient(circle at 66% 50%, rgba(255, 180, 60, 0.9) 0 20%, transparent 22%),
+      linear-gradient(90deg, #2a2f36 0 34%, #111820 35% 47%, transparent 48%);
+    box-shadow: 0 0 10px rgba(255, 120, 40, 0.55);
+  }
+
+  .cannon-shot-art-lg {
+    width: 46px;
+    height: 26px;
+    box-shadow: 0 0 18px rgba(255, 120, 40, 0.75);
+  }
+
+  .panel {
+    background: linear-gradient(180deg, rgba(14, 32, 52, 0.85), rgba(8, 19, 32, 0.92));
+    border: 1px solid rgba(176, 122, 60, 0.45);
+    border-radius: 6px;
+    box-shadow:
+      inset 0 0 0 1px rgba(176, 122, 60, 0.08),
+      0 6px 18px rgba(0, 0, 0, 0.4);
+  }
+
+  .panel-header {
+    font-family: Georgia, 'Times New Roman', serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #d9a35b;
+    border-bottom: 1px solid rgba(176, 122, 60, 0.35);
+  }
+
+  .btn {
+    @apply px-3 py-1.5 rounded text-xs font-medium transition-colors duration-150 select-none;
+    border: 1px solid rgba(176, 122, 60, 0.45);
+    background: rgba(14, 32, 52, 0.7);
+    color: #d9c3a0;
+  }
+  .btn:hover {
+    background: rgba(176, 122, 60, 0.18);
+    border-color: rgba(217, 163, 91, 0.8);
+    color: #f0dcb8;
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-rune {
+    border-color: rgba(52, 226, 160, 0.5);
+    color: #9ff0cf;
+  }
+  .btn-rune:hover {
+    background: rgba(52, 226, 160, 0.15);
+    border-color: rgba(52, 226, 160, 0.85);
+    box-shadow: 0 0 10px rgba(52, 226, 160, 0.35);
+    color: #c9ffe8;
+  }
+
+  .btn-danger {
+    border-color: rgba(224, 82, 77, 0.5);
+    color: #f1a9a6;
+  }
+  .btn-danger:hover {
+    background: rgba(224, 82, 77, 0.18);
+    border-color: rgba(224, 82, 77, 0.9);
+    color: #ffd0cd;
+  }
+
+  .btn-gold {
+    border-color: rgba(232, 198, 106, 0.6);
+    color: #f0dca0;
+  }
+  .btn-gold:hover {
+    background: rgba(232, 198, 106, 0.18);
+    box-shadow: 0 0 10px rgba(232, 198, 106, 0.3);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide;
+    border: 1px solid rgba(176, 122, 60, 0.4);
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .stat-row {
+    @apply flex items-center justify-between gap-2 py-[3px] text-[12px];
+    border-bottom: 1px dashed rgba(176, 122, 60, 0.12);
+  }
+  .stat-label {
+    color: #8aa0b4;
+  }
+  .stat-value {
+    color: #e6eff7;
+    font-weight: 500;
+  }
+
+  .num-input {
+    @apply w-full rounded px-2 py-1 text-xs text-right;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(176, 122, 60, 0.4);
+    color: #e6eff7;
+  }
+  .num-input:focus {
+    outline: none;
+    border-color: rgba(52, 226, 160, 0.7);
+    box-shadow: 0 0 6px rgba(52, 226, 160, 0.3);
+  }
+
+  .text-input {
+    @apply rounded px-2 py-1 text-xs;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(176, 122, 60, 0.4);
+    color: #e6eff7;
+  }
+  .text-input:focus {
+    outline: none;
+    border-color: rgba(52, 226, 160, 0.7);
+  }
+}
+
+/* Скроллбары в морском стиле */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(176, 122, 60, 0.5) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(176, 122, 60, 0.45);
+  border-radius: 5px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(217, 163, 91, 0.7);
+}
+
+.rune-glow {
+  text-shadow: 0 0 8px rgba(52, 226, 160, 0.6);
+}
