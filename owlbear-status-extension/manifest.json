@@ -1,0 +1,12 @@
+{
+  "name": "Верфь Нового Мира: статус корабля",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "action": {
+    "title": "Корабль",
+    "icon": "icon.svg",
+    "popover": "index.html",
+    "height": 700,
+    "width": 420
+  }
+}
