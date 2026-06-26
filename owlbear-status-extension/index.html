@@ -3,22 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Верфь Нового Мира: статус корабля</title>
+  <title>Ship Status</title>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #1b130d;
-      --panel: #2b1d13;
-      --panel-2: #382616;
-      --line: #8e6235;
-      --line-soft: rgba(203, 149, 78, 0.28);
-      --text: #f4dfbd;
-      --muted: #c9aa7a;
-      --accent: #37d6c9;
-      --gold: #ffbf4d;
-      --danger: #ff6b58;
-      --ok: #56e39f;
-      --warn: #ffd166;
+      --bg: #05070b;
+      --panel: #0d1118;
+      --panel-2: #121824;
+      --line: #334155;
+      --line-soft: rgba(148, 163, 184, 0.22);
+      --text: #dce7f3;
+      --muted: #8393a7;
+      --accent: #38d6ff;
+      --gold: #a9c7ff;
+      --danger: #ff5f68;
+      --ok: #57e7a2;
+      --warn: #ffd36a;
     }
 
     * { box-sizing: border-box; }
@@ -27,8 +27,9 @@
       margin: 0;
       min-height: 100vh;
       background:
-        radial-gradient(circle at 12% 5%, rgba(255, 185, 86, 0.12), transparent 26rem),
-        linear-gradient(135deg, #140d09 0%, #24170d 55%, #100b08 100%);
+        radial-gradient(circle at 12% 4%, rgba(56, 214, 255, 0.08), transparent 24rem),
+        radial-gradient(circle at 92% 20%, rgba(110, 59, 255, 0.08), transparent 18rem),
+        linear-gradient(145deg, #020308 0%, #080b12 48%, #030409 100%);
       color: var(--text);
       font: 14px/1.45 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     }
@@ -50,8 +51,8 @@
       padding: 14px;
       border: 1px solid var(--line);
       border-radius: 10px;
-      background: linear-gradient(180deg, rgba(63, 41, 21, 0.94), rgba(36, 24, 15, 0.96));
-      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+      background: linear-gradient(180deg, rgba(18, 24, 36, 0.96), rgba(7, 10, 16, 0.98));
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.58);
     }
 
     .title-row {
@@ -68,7 +69,7 @@
       place-items: center;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #15100d;
+      background: #070a11;
     }
 
     h1 {
@@ -101,7 +102,7 @@
       color: var(--text);
       border: 1px solid var(--line-soft);
       border-radius: 7px;
-      background: rgba(13, 9, 6, 0.72);
+      background: rgba(3, 5, 10, 0.78);
       padding: 8px 9px;
       outline: none;
     }
@@ -128,7 +129,7 @@
       margin-top: 10px;
       border: 1px solid var(--line-soft);
       border-radius: 10px;
-      background: rgba(28, 18, 11, 0.82);
+      background: rgba(8, 11, 17, 0.88);
       overflow: hidden;
     }
 
@@ -140,7 +141,7 @@
       padding: 9px 11px;
       border-bottom: 1px solid var(--line-soft);
       color: var(--gold);
-      background: rgba(52, 33, 18, 0.62);
+      background: rgba(15, 21, 31, 0.78);
       font: 700 12px/1 Georgia, "Times New Roman", serif;
       text-transform: uppercase;
       letter-spacing: .05em;
@@ -214,7 +215,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       color: var(--text);
-      background: linear-gradient(180deg, #4a321d, #2b1d12);
+      background: linear-gradient(180deg, #182233, #0b1019);
       cursor: pointer;
       font-weight: 700;
     }
@@ -226,12 +227,12 @@
     .btn.primary {
       color: #07110f;
       border-color: #69f5e8;
-      background: linear-gradient(180deg, #69f5e8, #29bdb0);
+      background: linear-gradient(180deg, #65dcff, #1797c2);
     }
 
     .btn.danger {
       border-color: #b84a3d;
-      background: linear-gradient(180deg, #7e342a, #422018);
+      background: linear-gradient(180deg, #65252a, #251014);
     }
 
     .resource {
@@ -351,8 +352,7 @@
           </svg>
         </div>
         <div>
-          <h1>Статус корабля</h1>
-          <div class="sub">Локальная панель для Owlbear Rodeo</div>
+          <h1>Ship Status</h1>
         </div>
       </div>
       <div class="field">
@@ -378,7 +378,6 @@
           <div class="stat"><b>ХП</b><span id="hpText">0 / 0</span></div>
           <div class="stat"><b>КД</b><span id="acText">0</span></div>
           <div class="stat"><b>Скорость</b><span id="speedText">0 фт</span></div>
-          <div class="stat"><b>Нагрузка</b><span id="loadText">0 / 0</span></div>
         </div>
         <div class="bar" aria-label="Полоса здоровья"><div id="hpFill" class="fill"></div></div>
         <div class="grid-2">
@@ -389,6 +388,14 @@
           <div class="field">
             <label for="maxHP">Максимум ХП</label>
             <input id="maxHP" type="number" min="1" step="1">
+          </div>
+          <div class="field">
+            <label for="ac">КД</label>
+            <input id="ac" type="number" min="0" step="1">
+          </div>
+          <div class="field">
+            <label for="speed">Скорость, фт</label>
+            <input id="speed" type="number" min="0" step="1">
           </div>
         </div>
       </div>
@@ -406,6 +413,14 @@
           <div class="field">
             <label for="currentEnergy">Текущая МЭ</label>
             <input id="currentEnergy" type="number" min="0" step="1">
+          </div>
+          <div class="field">
+            <label for="energyGeneration">МЭ/Раунд</label>
+            <input id="energyGeneration" type="number" min="0" step="1">
+          </div>
+          <div class="field">
+            <label for="energyStorage">Максимум МЭ</label>
+            <input id="energyStorage" type="number" min="0" step="1">
           </div>
           <div class="field">
             <label for="energySpend">Расход МЭ</label>
@@ -516,7 +531,7 @@
     const clamp = (n, min, max = Number.POSITIVE_INFINITY) => Math.max(min, Math.min(max, Math.round(Number(n) || 0)));
     const fmt = (n) => new Intl.NumberFormat("ru-RU").format(Math.round(Number(n) || 0));
 
-    const fields = ["shipName", "day", "players", "currentHP", "maxHP", "currentEnergy"];
+    const fields = ["shipName", "day", "players", "currentHP", "maxHP", "ac", "speed", "currentEnergy", "energyGeneration", "energyStorage"];
     for (const id of fields) {
       $(id).addEventListener("input", () => {
         state.shipName = $("shipName").value || defaults.shipName;
@@ -524,6 +539,10 @@
         state.playerCount = clamp($("players").value, 1);
         state.maxHP = clamp($("maxHP").value, 1);
         state.currentHP = clamp($("currentHP").value, 0, state.maxHP);
+        state.ac = clamp($("ac").value, 0);
+        state.speed = clamp($("speed").value, 0);
+        state.energyGeneration = clamp($("energyGeneration").value, 0);
+        state.energyStorage = clamp($("energyStorage").value, 0);
         state.currentEnergy = clamp($("currentEnergy").value, 0, Math.max(0, state.energyStorage));
         save("Изменения сохранены.");
       });
@@ -605,6 +624,8 @@
       next.log = Array.isArray(next.log) ? next.log.slice(-40) : [];
       next.playerCount = clamp(next.playerCount, 1);
       next.day = clamp(next.day, 1);
+      next.ac = clamp(next.ac, 0);
+      next.speed = clamp(next.speed, 0);
       next.maxHP = clamp(next.maxHP, 1);
       next.currentHP = clamp(next.currentHP, 0, next.maxHP);
       next.energyStorage = clamp(next.energyStorage, 0);
@@ -718,12 +739,15 @@
       $("players").value = state.playerCount;
       $("currentHP").value = state.currentHP;
       $("maxHP").value = state.maxHP;
+      $("ac").value = state.ac;
+      $("speed").value = state.speed;
       $("currentEnergy").value = state.currentEnergy;
+      $("energyGeneration").value = state.energyGeneration;
+      $("energyStorage").value = state.energyStorage;
 
       $("hpText").textContent = `${fmt(state.currentHP)} / ${fmt(state.maxHP)}`;
       $("acText").textContent = fmt(state.ac);
       $("speedText").textContent = `${fmt(state.speed)} фт`;
-      $("loadText").textContent = `${fmt(state.totalLoad)} / ${fmt(state.maxLoad)}`;
       $("energyText").textContent = `${fmt(state.currentEnergy)} / ${fmt(state.energyStorage)}`;
       $("genText").textContent = `+${fmt(state.energyGeneration)}`;
 

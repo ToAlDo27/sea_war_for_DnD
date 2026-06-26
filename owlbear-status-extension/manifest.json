@@ -1,9 +1,9 @@
 {
-  "name": "Верфь Нового Мира: статус корабля",
+  "name": "Ship Status",
   "version": "1.0.0",
   "manifest_version": 1,
   "action": {
-    "title": "Корабль",
+    "title": "Ship Status",
     "icon": "https://raw.githack.com/ToAlDo27/sea_war_for_DnD/main/owlbear-status-extension/icon.svg",
     "popover": "https://raw.githack.com/ToAlDo27/sea_war_for_DnD/main/owlbear-status-extension/index.html",
     "height": 700,
