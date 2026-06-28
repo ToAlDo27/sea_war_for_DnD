@@ -524,12 +524,18 @@
     let state = load();
     let obr = null;
     let syncMode = "local";
+    let syncStatus = "connecting";
     let applyingRemote = false;
+    let publishTimer = null;
+    let publishInFlight = false;
+    let publishPending = false;
     let lastRemoteAt = 0;
+    let heartbeatTimer = null;
 
     const $ = (id) => document.getElementById(id);
     const clamp = (n, min, max = Number.POSITIVE_INFINITY) => Math.max(min, Math.min(max, Math.round(Number(n) || 0)));
     const fmt = (n) => new Intl.NumberFormat("ru-RU").format(Math.round(Number(n) || 0));
+    const clientId = getClientId();
 
     const fields = ["shipName", "day", "players", "currentHP", "maxHP", "ac", "speed", "currentEnergy", "energyGeneration", "energyStorage"];
     for (const id of fields) {
@@ -544,8 +550,10 @@
         state.energyGeneration = clamp($("energyGeneration").value, 0);
         state.energyStorage = clamp($("energyStorage").value, 0);
         state.currentEnergy = clamp($("currentEnergy").value, 0, Math.max(0, state.energyStorage));
-        save("Изменения сохранены.");
+        save(null, { render: false });
       });
+      $(id).addEventListener("change", () => save("Изменения сохранены.", { immediate: true }));
+      $(id).addEventListener("blur", () => render());
     }
 
     $("endDayBtn").addEventListener("click", () => {
@@ -634,13 +642,14 @@
       return next;
     }
 
-    function save(message) {
+    function save(message, options = {}) {
       if (message) addLog("ok", message, false);
       state.updatedAt = Date.now();
+      state.sourceClient = clientId;
       state = normalize(state);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      render();
-      publishRoomState();
+      if (options.render !== false) render();
+      schedulePublish(options.immediate ? 0 : 450);
     }
 
     function addLog(kind, text, rerender = true) {
@@ -734,16 +743,16 @@
     }
 
     function render() {
-      $("shipName").value = state.shipName;
-      $("day").value = state.day;
-      $("players").value = state.playerCount;
-      $("currentHP").value = state.currentHP;
-      $("maxHP").value = state.maxHP;
-      $("ac").value = state.ac;
-      $("speed").value = state.speed;
-      $("currentEnergy").value = state.currentEnergy;
-      $("energyGeneration").value = state.energyGeneration;
-      $("energyStorage").value = state.energyStorage;
+      setInputValue("shipName", state.shipName);
+      setInputValue("day", state.day);
+      setInputValue("players", state.playerCount);
+      setInputValue("currentHP", state.currentHP);
+      setInputValue("maxHP", state.maxHP);
+      setInputValue("ac", state.ac);
+      setInputValue("speed", state.speed);
+      setInputValue("currentEnergy", state.currentEnergy);
+      setInputValue("energyGeneration", state.energyGeneration);
+      setInputValue("energyStorage", state.energyStorage);
 
       $("hpText").textContent = `${fmt(state.currentHP)} / ${fmt(state.maxHP)}`;
       $("acText").textContent = fmt(state.ac);
@@ -758,8 +767,7 @@
 
       const overload = Number(state.totalLoad) > Number(state.maxLoad);
       const dead = Number(state.currentHP) <= 0;
-      $("statusTag").textContent = syncMode === "room" ? (dead ? "разбит" : overload ? "перегруз" : "онлайн") : (dead ? "разбит" : overload ? "перегруз" : "локально");
-      $("statusTag").style.color = dead || overload ? "var(--danger)" : "var(--accent)";
+      renderStatus(dead, overload);
 
       const need = clamp(state.playerCount, 1);
       $("dailyNeed").textContent = `${need} еды / ${need} воды`;
@@ -768,6 +776,33 @@
       renderResources();
       renderModules();
       renderLog();
+    }
+
+    function setInputValue(id, value) {
+      const input = $(id);
+      if (!input || document.activeElement === input) return;
+      input.value = value ?? "";
+    }
+
+    function renderStatus(dead = Number(state.currentHP) <= 0, overload = Number(state.totalLoad) > Number(state.maxLoad)) {
+      const tag = $("statusTag");
+      if (dead) {
+        tag.textContent = "разбит";
+        tag.style.color = "var(--danger)";
+        return;
+      }
+      if (overload) {
+        tag.textContent = "перегруз";
+        tag.style.color = "var(--danger)";
+        return;
+      }
+      if (syncMode !== "room") {
+        tag.textContent = "локально";
+        tag.style.color = "var(--muted)";
+        return;
+      }
+      tag.textContent = syncStatus === "syncing" ? "синхр." : syncStatus === "error" ? "сбой сети" : "онлайн";
+      tag.style.color = syncStatus === "error" ? "var(--warn)" : "var(--accent)";
     }
 
     function compactState(next) {
@@ -788,29 +823,57 @@
         generators: (next.generators || []).slice(0, 20),
         consumers: (next.consumers || []).slice(0, 30),
         updatedAt: next.updatedAt || Date.now(),
+        sourceClient: clientId,
         log: (next.log || []).slice(0, 20)
       };
     }
 
+    function schedulePublish(delay = 450) {
+      if (!obr || syncMode !== "room" || applyingRemote) return;
+      clearTimeout(publishTimer);
+      publishTimer = setTimeout(() => publishRoomState(), delay);
+    }
+
     async function publishRoomState() {
       if (!obr || syncMode !== "room" || applyingRemote) return;
+      if (publishInFlight) {
+        publishPending = true;
+        return;
+      }
+      publishInFlight = true;
+      publishPending = false;
       try {
+        syncStatus = "syncing";
+        renderStatus();
         await obr.room.setMetadata({ [METADATA_KEY]: compactState(state) });
+        syncStatus = "online";
+        renderStatus();
       } catch (error) {
-        syncMode = "local";
+        syncStatus = "error";
         addLog("warn", `Не удалось обновить комнату Owlbear: ${error.message || error}`);
-        render();
+        renderStatus();
+      } finally {
+        publishInFlight = false;
+        if (publishPending) schedulePublish(600);
       }
     }
 
     function applyRoomState(remote) {
       if (!remote || typeof remote !== "object") return;
       const remoteAt = Number(remote.updatedAt) || 0;
-      if (remoteAt < lastRemoteAt) return;
+      if (remote.sourceClient === clientId) {
+        lastRemoteAt = Math.max(lastRemoteAt, remoteAt);
+        syncStatus = "online";
+        renderStatus();
+        return;
+      }
+      if (remoteAt <= lastRemoteAt || remoteAt <= (Number(state.updatedAt) || 0)) return;
+      if (document.activeElement && ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
       lastRemoteAt = remoteAt;
       applyingRemote = true;
       state = normalize({ ...structuredClone(defaults), ...remote });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      syncStatus = "online";
       render();
       applyingRemote = false;
     }
@@ -820,12 +883,14 @@
         const mod = await import(SDK_URL);
         obr = mod.default;
       } catch (error) {
+        syncStatus = "error";
         addLog("warn", "SDK Owlbear не загружен. Панель работает локально.");
         render();
         return;
       }
 
       if (!obr?.isAvailable) {
+        syncStatus = "local";
         addLog("warn", "Панель открыта вне Owlbear. Синхронизация комнаты отключена.");
         render();
         return;
@@ -839,6 +904,7 @@
       try {
         await onReady();
         syncMode = "room";
+        syncStatus = "online";
         const metadata = await obr.room.getMetadata();
         const remote = metadata?.[METADATA_KEY];
         if (remote) {
@@ -846,6 +912,7 @@
           addLog("ok", "Подключено к общему статусу комнаты Owlbear.");
         } else {
           state.updatedAt = Date.now();
+          state.sourceClient = clientId;
           await obr.room.setMetadata({ [METADATA_KEY]: compactState(state) });
           addLog("ok", "Создан общий статус комнаты Owlbear.");
           save();
@@ -854,15 +921,45 @@
           const next = metadata?.[METADATA_KEY];
           if (next) applyRoomState(next);
         });
+        heartbeatTimer = setInterval(() => {
+          if (syncMode === "room") schedulePublish(0);
+        }, 15000);
+        window.addEventListener("focus", async () => {
+          try {
+            const fresh = await obr.room.getMetadata();
+            const next = fresh?.[METADATA_KEY];
+            if (next) applyRoomState(next);
+            schedulePublish(300);
+          } catch {
+            syncStatus = "error";
+            renderStatus();
+          }
+        });
       } catch (error) {
         syncMode = "local";
+        syncStatus = "error";
         addLog("warn", `Синхронизация Owlbear недоступна: ${error.message || error}`);
         render();
       }
     }
 
+    function getClientId() {
+      const key = `${STORAGE_KEY}:client-id`;
+      try {
+        let saved = localStorage.getItem(key);
+        if (!saved) {
+          saved = `client-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          localStorage.setItem(key, saved);
+        }
+        return saved;
+      } catch {
+        return `client-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      }
+    }
+
     function renderResources() {
       const root = $("resources");
+      if (root.contains(document.activeElement)) return;
       root.innerHTML = "";
       for (const key of resourceOrder) {
         const row = document.createElement("div");
@@ -894,8 +991,10 @@
         });
         input.addEventListener("input", () => {
           state.resources[key] = clamp(input.value, 0);
-          save();
+          save(null, { render: false });
         });
+        input.addEventListener("change", () => save("Изменения сохранены.", { immediate: true }));
+        input.addEventListener("blur", () => render());
 
         row.append(name, minus, input, plus);
         root.append(row);
